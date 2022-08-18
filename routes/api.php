@@ -25,4 +25,5 @@ Route::group([
     Route::post('/refresh', [AuthController::class, 'refresh']);
     Route::post('/user-profile', [AuthController::class, 'userProfile']);
     Route::post('/change-pass', [AuthController::class, 'changePassWord']);    
+    Route::post('/add-role', [AuthController::class, 'addRole']);    
 });

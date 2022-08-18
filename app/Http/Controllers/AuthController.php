@@ -2,7 +2,13 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\AddRoleRequest;
+use App\Http\Requests\UserLoginRequest;
+use App\Http\Requests\UserRegisterRequest;
+use App\Http\Resources\UserResource;
+use App\Models\Role;
 use App\Models\User;
+use Exception;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Validator;
@@ -16,7 +22,7 @@ class AuthController extends Controller
      */
     public function __construct()
     {
-        $this->middleware('auth:api', ['except' => ['login', 'register']]);
+        $this->middleware('auth:api', ['except' => ['login']]);
     }
 
     /**
@@ -24,21 +30,12 @@ class AuthController extends Controller
      *
      * @return \Illuminate\Http\JsonResponse
      */
-    public function login(Request $request)
+    public function login(UserLoginRequest $request)
     {
-        $validator = Validator::make($request->all(), [
-            'email' => 'required|email',
-            'password' => 'required|string|min:6',
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json($validator->errors(), 422);
+        $user = $request->only('email', 'password');
+        if (!$token = Auth::attempt($user)) {
+            return response()->json(['error' => 'Unauthorized', 'status' => "failed"], 401);
         }
-
-        if (!$token = Auth::attempt($validator->validated())) {
-            return response()->json(['error' => 'Unauthorized'], 401);
-        }
-
         return $this->createNewToken($token);
     }
 
@@ -47,26 +44,26 @@ class AuthController extends Controller
      *
      * @return \Illuminate\Http\JsonResponse
      */
-    public function register(Request $request)
+    public function register(UserRegisterRequest $request)
     {
-        $validator = Validator::make($request->all(), [
-            'name' => 'required|string|between:2,100',
-            'email' => 'required|string|email|max:100|unique:users',
-            'password' => 'required|string|confirmed|min:6',
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json($validator->errors()->toJson(), 400);
+        if (!Auth::user()->authorizeRoles('admin')) {
+            return response()->json([
+                'message' => 'Action unauthorized!',
+            ], 201);
         }
 
         $user = User::create(array_merge(
-            $validator->validated(),
+            $request->all(),
             ['password' => bcrypt($request->password)]
         ));
 
+        $role = Role::where('name', 'user')->first();
+        $user->roles()->attach($role);
+
         return response()->json([
+            'status' => 'success',
             'message' => 'User successfully registered',
-            'user' => $user
+            'user' => new UserResource($user)
         ], 201);
     }
 
@@ -79,8 +76,7 @@ class AuthController extends Controller
     public function logout()
     {
         Auth::logout();
-
-        return response()->json(['message' => 'User successfully signed out']);
+        return response()->json(['message' => 'User successfully signed out', 'status' => 'success']);
     }
 
     /**
@@ -100,7 +96,7 @@ class AuthController extends Controller
      */
     public function userProfile()
     {
-        return response()->json(Auth::user());
+        return new UserResource(Auth::user());
     }
 
     /**
@@ -116,8 +112,42 @@ class AuthController extends Controller
             'access_token' => $token,
             'token_type' => 'bearer',
             'expires_in' => Auth::factory()->getTTL() * 60,
-            'user' => Auth::user()
+            'user' => new UserResource(Auth::user()),
         ]);
+    }
+
+    public function addRole(AddRoleRequest $request)
+    {
+        if (!Auth::user()->authorizeRoles('admin')) {
+            return response()->json([
+                'message' => 'Action unauthorized!',
+            ], 201);
+        }
+
+        if (Auth::user()->id == $request->user_id) {
+            return response()->json([
+                'message' => 'Action unauthorized (id error)!',
+            ], 201);
+        }
+
+        try {
+            $user = User::where('id', $request->user_id)->firstOrFail();
+            $user->roles()->detach();
+            foreach ($request->roles as $item) {
+                $role = Role::where('name', $item)->firstOrFail();
+                $user->roles()->attach($role);
+            }
+
+            return response()->json([
+                'message' => 'User Successfully add new role',
+                'status' => 'success'
+            ], 201);
+        } catch (Exception $e) {
+            return response()->json([
+                'message' => 'Error when add new role!',
+                'status' => 'fail'
+            ], 201);
+        }
     }
 
     public function changePassWord(Request $request)

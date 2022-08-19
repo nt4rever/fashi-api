@@ -1,8 +1,10 @@
 <?php
 
-namespace App\Http\Requests;
+namespace App\Http\Requests\Auth;
 
-class AddRoleRequest extends FormRequest
+use App\Http\Requests\FormRequest;
+
+class DeleteUserRequest extends FormRequest
 {
     /**
      * Determine if the user is authorized to make this request.
@@ -22,9 +24,7 @@ class AddRoleRequest extends FormRequest
     public function rules()
     {
         return [
-            'user_id' => 'required',
-            'roles'    => 'required|array|min:1|max:3',
-            'rolse.*' => 'required|string|distinct|max:2'
+            'user_id' => 'required|integer',
         ];
     }
 }

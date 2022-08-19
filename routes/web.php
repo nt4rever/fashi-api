@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Resources\API;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -20,6 +21,6 @@ Route::get('/', function () {
 Route::get('/login', function () {
     return response()->json([
         'message' => 'API token unauthorized!',
-        'status' => "failed"
+        'status' => API::STATUS_ATHORIZE_FAILED
     ], 201);
 })->name('login');

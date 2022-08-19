@@ -2,27 +2,29 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Requests\AddRoleRequest;
-use App\Http\Requests\UserLoginRequest;
-use App\Http\Requests\UserRegisterRequest;
+use App\Http\Requests\Auth\AddRoleRequest;
+use App\Http\Requests\Auth\ChangePasswordRequest;
+use App\Http\Requests\Auth\DeleteUserRequest;
+use App\Http\Requests\Auth\UserLoginRequest;
+use App\Http\Requests\Auth\UserRegisterRequest;
+use App\Http\Resources\API;
 use App\Http\Resources\UserResource;
-use App\Models\Role;
-use App\Models\User;
-use Exception;
-use Illuminate\Http\Request;
+use App\Services\UserService;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Validator;
 
 class AuthController extends Controller
 {
+    protected $userService;
+
     /**
      * Create a new AuthController instance.
      *
      * @return void
      */
-    public function __construct()
+    public function __construct(UserService $userService)
     {
         $this->middleware('auth:api', ['except' => ['login']]);
+        $this->userService = $userService;
     }
 
     /**
@@ -34,7 +36,10 @@ class AuthController extends Controller
     {
         $user = $request->only('email', 'password');
         if (!$token = Auth::attempt($user)) {
-            return response()->json(['error' => 'Unauthorized', 'status' => "failed"], 401);
+            return response()->json([
+                'error' => 'Unauthorized',
+                'status' => API::STATUS_ATHORIZE_FAILED
+            ], 401);
         }
         return $this->createNewToken($token);
     }
@@ -46,27 +51,15 @@ class AuthController extends Controller
      */
     public function register(UserRegisterRequest $request)
     {
-        if (!Auth::user()->authorizeRoles('admin')) {
-            return response()->json([
-                'message' => 'Action unauthorized!',
-            ], 201);
-        }
-
-        $user = User::create(array_merge(
-            $request->all(),
-            ['password' => bcrypt($request->password)]
-        ));
-
-        $role = Role::where('name', 'user')->first();
-        $user->roles()->attach($role);
-
-        return response()->json([
-            'status' => 'success',
-            'message' => 'User successfully registered',
-            'user' => new UserResource($user)
-        ], 201);
+        $res = $this->userService->create($request, Auth::user()->id);
+        return response()->json($res, 201);
     }
 
+    public function addRole(AddRoleRequest $request)
+    {
+        $res = $this->userService->addRole($request, Auth::user()->id);
+        return response()->json($res, 201);
+    }
 
     /**
      * Log the user out (Invalidate the token).
@@ -76,7 +69,10 @@ class AuthController extends Controller
     public function logout()
     {
         Auth::logout();
-        return response()->json(['message' => 'User successfully signed out', 'status' => 'success']);
+        return response()->json([
+            'message' => 'User successfully signed out',
+            'status' => API::STATUS_SUCCESS
+        ]);
     }
 
     /**
@@ -96,7 +92,21 @@ class AuthController extends Controller
      */
     public function userProfile()
     {
-        return new UserResource(Auth::user());
+        return response()->json([
+            'data' => new UserResource(Auth::user()),
+            'status' => API::STATUS_SUCCESS
+        ], 201);;
+    }
+
+    public function changePassWord(ChangePasswordRequest $request)
+    {
+        $res = $this->userService->changePassWord($request, Auth::user()->id);
+        return response()->json($res, 201);
+    }
+
+    public function delete(DeleteUserRequest $request)
+    {
+        return response()->json($this->userService->deleteUser($request, Auth::user()->id), 201);
     }
 
     /**
@@ -113,62 +123,7 @@ class AuthController extends Controller
             'token_type' => 'bearer',
             'expires_in' => Auth::factory()->getTTL() * 60,
             'user' => new UserResource(Auth::user()),
+            'status' => API::STATUS_SUCCESS
         ]);
-    }
-
-    public function addRole(AddRoleRequest $request)
-    {
-        if (!Auth::user()->authorizeRoles('admin')) {
-            return response()->json([
-                'message' => 'Action unauthorized!',
-            ], 201);
-        }
-
-        if (Auth::user()->id == $request->user_id) {
-            return response()->json([
-                'message' => 'Action unauthorized (id error)!',
-            ], 201);
-        }
-
-        try {
-            $user = User::where('id', $request->user_id)->firstOrFail();
-            $user->roles()->detach();
-            foreach ($request->roles as $item) {
-                $role = Role::where('name', $item)->firstOrFail();
-                $user->roles()->attach($role);
-            }
-
-            return response()->json([
-                'message' => 'User Successfully add new role',
-                'status' => 'success'
-            ], 201);
-        } catch (Exception $e) {
-            return response()->json([
-                'message' => 'Error when add new role!',
-                'status' => 'fail'
-            ], 201);
-        }
-    }
-
-    public function changePassWord(Request $request)
-    {
-        $validator = Validator::make($request->all(), [
-            'old_password' => 'required|string|min:6',
-            'new_password' => 'required|string|confirmed|min:6',
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json($validator->errors()->toJson(), 400);
-        }
-        $userId = Auth::user()->id;
-
-        $user = User::where('id', $userId)->update(
-            ['password' => bcrypt($request->new_password)]
-        );
-
-        return response()->json([
-            'message' => 'User successfully changed password',
-            'user' => $user,
-        ], 201);
     }
 }

@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Http\Resources\API;
 use Illuminate\Foundation\Http\FormRequest as LaravelFormRequest;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Contracts\Validation\Validator;
@@ -39,7 +40,7 @@ abstract class FormRequest extends LaravelFormRequest
         throw new HttpResponseException(
             response()->json([
                 'errors' => $errors,
-                'status' => "failed"
+                'status' => API::STATUS_VALIDATE_FAILED
             ], JsonResponse::HTTP_UNPROCESSABLE_ENTITY)
         );
     }
@@ -48,7 +49,7 @@ abstract class FormRequest extends LaravelFormRequest
     {
         return response()->json([
             'message' => 'Action unauthorized!',
-            'status' => "failed"
+            'status' => API::STATUS_ATHORIZE_FAILED
         ], JsonResponse::HTTP_ACCEPTED);
     }
 }

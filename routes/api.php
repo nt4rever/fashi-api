@@ -23,7 +23,8 @@ Route::group([
     Route::post('/register', [AuthController::class, 'register']);
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::post('/refresh', [AuthController::class, 'refresh']);
-    Route::post('/user-profile', [AuthController::class, 'userProfile']);
-    Route::post('/change-pass', [AuthController::class, 'changePassWord']);    
+    Route::post('/user', [AuthController::class, 'userProfile']);
+    Route::post('/change-password', [AuthController::class, 'changePassWord']);    
     Route::post('/add-role', [AuthController::class, 'addRole']);    
+    Route::post('/delete', [AuthController::class, 'delete']);    
 });

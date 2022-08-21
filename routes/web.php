@@ -18,9 +18,4 @@ Route::get('/', function () {
     return view('welcome');
 });
 
-Route::get('/login', function () {
-    return response()->json([
-        'message' => 'API token unauthorized!',
-        'status' => API::STATUS_ATHORIZE_FAILED
-    ], 201);
-})->name('login');
+

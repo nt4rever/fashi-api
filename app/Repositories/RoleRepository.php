@@ -15,11 +15,11 @@ class RoleRepository implements Repository
 
     public function find($id)
     {
-        return $this->role->find($id);
+        return $this->role->findOrFail($id);
     }
 
     public function findByName($name)
     {
-        return $this->role->where('name', $name)->first();
+        return $this->role->where('name', $name)->firstOrFail();
     }
 }

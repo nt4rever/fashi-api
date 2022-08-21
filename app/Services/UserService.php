@@ -2,14 +2,12 @@
 
 namespace App\Services;
 
-use App\Http\Requests\Auth\AddRoleRequest;
-use App\Http\Requests\Auth\ChangePasswordRequest;
-use App\Http\Requests\Auth\DeleteUserRequest;
-use App\Http\Requests\Auth\UserRegisterRequest;
 use App\Http\Resources\API;
 use App\Http\Resources\UserResource;
 use App\Repositories\RoleRepository;
 use App\Repositories\UserRepository;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash;
 
 /**
  * Class UserService
@@ -26,68 +24,76 @@ class UserService
         $this->roleRepository = $roleRepository;
     }
 
-    public function create(UserRegisterRequest $request, $id)
+    public function createUser($request)
     {
-        $auth = $this->userRepository->find($id);
-        if (!$auth->authorizeRoles('admin')) {
-            return [
-                'message' => 'Action unauthorized!',
-                'status' => API::STATUS_ATHORIZE_FAILED
-            ];
-        }
         $attributes = $request->only('email', 'name', 'password');
         $user = $this->userRepository->create($attributes);
         $r = $this->roleRepository->findByName('user');
         $this->userRepository->attachRole($user->id, $r);
         return [
-            'message' => 'User successfully registered',
+            'message' => 'User registration successful.',
             'user' => new UserResource($user),
             'status' => API::STATUS_SUCCESS
         ];
     }
 
-    public function addRole(AddRoleRequest $request, $id)
+    public function addUserRole($request)
     {
-        $this->validateUser($request->user_id, $id);
-        $this->userRepository->detachRole($request->user_id);
-        foreach ($request->roles as $item) {
-            $role = $this->roleRepository->findByName($item);
-            $this->userRepository->attachRole($request->user_id, $role);
-        }
-        return [
-            'message' => 'User Successfully add new role',
-            'status' => API::STATUS_SUCCESS
-        ];
-    }
-
-    public function changePassword(ChangePasswordRequest $request, $id)
-    {
-        $this->userRepository->update($id, ['password' => $request->new_password]);
-        return [
-            'message' => 'User successfully changed password',
-            'status' => API::STATUS_SUCCESS
-        ];
-    }
-
-    public function deleteUser(DeleteUserRequest $request, $id)
-    {
-        $this->validateUser($request->user_id, $id);
-        $this->userRepository->detachRole($request->user_id);
-        $this->userRepository->delete($request->user_id);
-        return [
-            'message' => 'Delete user successfully',
-            'status' => API::STATUS_SUCCESS
-        ];
-    }
-
-    protected function validateUser($id, $auth_id)
-    {
-        $auth = $this->userRepository->find($auth_id);
-        if (!$auth->authorizeRoles('admin') || $auth->id == $id) {
+        if (Auth::user()->id == $request->id) {
             return [
                 'message' => 'Action unauthorized!',
                 'status' => API::STATUS_ATHORIZE_FAILED
             ];
         }
+        $this->userRepository->detachRole($request->id);
+        foreach ($request->roles as $item) {
+            $role = $this->roleRepository->findByName($item);
+            $this->userRepository->attachRole($request->id, $role);
+        }
+        return [
+            'message' => 'Add user role successfully.',
+            'status' => API::STATUS_SUCCESS
+        ];
+    }
+
+    public function changeUserPassword($request, $id)
+    {
+        $user = $this->userRepository->find($id);
+        if (!Hash::check($request->old_password, $user->password)) {
+            return [
+                'message' => 'Old password incorrect!',
+                'status' => API::STATUS_FAILED
+            ];
+        }
+        $this->userRepository->update($id, ['password' => $request->new_password]);
+        return [
+            'message' => 'Change user password successfully.',
+            'status' => API::STATUS_SUCCESS
+        ];
+    }
+
+    public function deleteUser($request)
+    {
+        if (Auth::user()->id == $request->id) {
+            return [
+                'message' => "Delete user failed, can't delete yourself.",
+                'status' => API::STATUS_ATHORIZE_FAILED
+            ];
+        }
+        $this->userRepository->detachRole($request->id);
+        $this->userRepository->delete($request->id);
+        return [
+            'message' => 'Delete user successfully.',
+            'status' => API::STATUS_SUCCESS
+        ];
+    }
+
+    public function allUser()
+    {
+        $all = $this->userRepository->all();
+        return [
+            'data' => UserResource::collection($all),
+            'status' => API::STATUS_SUCCESS
+        ];
     }
 }

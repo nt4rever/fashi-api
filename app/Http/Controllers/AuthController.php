@@ -23,7 +23,8 @@ class AuthController extends Controller
      */
     public function __construct(UserService $userService)
     {
-        $this->middleware('auth:api', ['except' => ['login']]);
+        $this->middleware('auth.role:admin,author,user', ['except' => ['login']]);
+        $this->middleware('auth.role:admin', ['only' => ['register', 'addRole', 'delete', 'allUser']]);
         $this->userService = $userService;
     }
 
@@ -51,13 +52,13 @@ class AuthController extends Controller
      */
     public function register(UserRegisterRequest $request)
     {
-        $res = $this->userService->create($request, Auth::user()->id);
+        $res = $this->userService->createUser($request);
         return response()->json($res, 201);
     }
 
     public function addRole(AddRoleRequest $request)
     {
-        $res = $this->userService->addRole($request, Auth::user()->id);
+        $res = $this->userService->addUserRole($request);
         return response()->json($res, 201);
     }
 
@@ -70,7 +71,7 @@ class AuthController extends Controller
     {
         Auth::logout();
         return response()->json([
-            'message' => 'User successfully signed out',
+            'message' => 'User successfully signed out.',
             'status' => API::STATUS_SUCCESS
         ]);
     }
@@ -100,13 +101,18 @@ class AuthController extends Controller
 
     public function changePassWord(ChangePasswordRequest $request)
     {
-        $res = $this->userService->changePassWord($request, Auth::user()->id);
+        $res = $this->userService->changeUserPassword($request, Auth::user()->id);
         return response()->json($res, 201);
     }
 
     public function delete(DeleteUserRequest $request)
     {
-        return response()->json($this->userService->deleteUser($request, Auth::user()->id), 201);
+        return response()->json($this->userService->deleteUser($request), 201);
+    }
+
+    public function allUser()
+    {
+        return response()->json($this->userService->allUser(), 201);
     }
 
     /**

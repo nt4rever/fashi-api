@@ -15,7 +15,7 @@ class UserRepository implements Repository
 
     public function find($id)
     {
-        return $this->user->find($id);
+        return $this->user->findOrFail($id);
     }
 
     public function create($attributes)
@@ -25,21 +25,26 @@ class UserRepository implements Repository
 
     public function update($id, $attributes)
     {
-        return $this->user->find($id)->update($attributes);
+        return $this->user->findOrFail($id)->update($attributes);
     }
 
     public function delete($id)
     {
-        return $this->user->find($id)->delete();
+        return $this->user->findOrFail($id)->delete();
+    }
+
+    public function all()
+    {
+        return $this->user->all();
     }
 
     public function attachRole($id, $role)
     {
-        return $this->user->find($id)->roles()->attach($role);
+        return $this->user->findOrFail($id)->roles()->attach($role);
     }
 
     public function detachRole($id)
     {
-        return $this->user->find($id)->roles()->detach();
+        return $this->user->findOrFail($id)->roles()->detach();
     }
 }
